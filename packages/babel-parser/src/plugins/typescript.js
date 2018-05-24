@@ -1283,7 +1283,8 @@ export default (superClass: Class<Parser>): Class<Parser> =>
     ): N.Pattern | N.TSParameterProperty {
       let accessibility: ?N.Accessibility;
       let readonly = false;
-      if (allowModifiers) {
+
+      if (allowModifiers && this.lookahead().type !== tt.parenR) {
         accessibility = this.parseAccessModifier();
         readonly = !!this.tsParseModifier(["readonly"]);
       }
