@@ -7,7 +7,15 @@ import type {
   FilePackageData,
 } from "./types";
 
+import type { CallerMetadata } from "../validation/options";
+
 export type { ConfigFile, IgnoreFile, RelativeConfig, FilePackageData };
+
+export function findConfigUpwards(
+  rootDir: string, // eslint-disable-line no-unused-vars
+): string | null {
+  return null;
+}
 
 export function findPackageData(filepath: string): FilePackageData {
   return {
@@ -19,15 +27,17 @@ export function findPackageData(filepath: string): FilePackageData {
 }
 
 export function findRelativeConfig(
-  pkgData: FilePackageData,
+  pkgData: FilePackageData, // eslint-disable-line no-unused-vars
   envName: string, // eslint-disable-line no-unused-vars
+  caller: CallerMetadata | void, // eslint-disable-line no-unused-vars
 ): RelativeConfig {
   return { pkg: null, config: null, ignore: null };
 }
 
 export function findRootConfig(
-  dirname: string,
+  dirname: string, // eslint-disable-line no-unused-vars
   envName: string, // eslint-disable-line no-unused-vars
+  caller: CallerMetadata | void, // eslint-disable-line no-unused-vars
 ): ConfigFile | null {
   return null;
 }
@@ -36,6 +46,7 @@ export function loadConfig(
   name: string,
   dirname: string,
   envName: string, // eslint-disable-line no-unused-vars
+  caller: CallerMetadata | void, // eslint-disable-line no-unused-vars
 ): ConfigFile {
   throw new Error(`Cannot load ${name} relative to ${dirname} in a browser`);
 }

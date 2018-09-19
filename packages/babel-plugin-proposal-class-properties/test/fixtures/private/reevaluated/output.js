@@ -1,15 +1,32 @@
 function classFactory() {
-  var _bar, _foo;
+  var _class, _temp, _foo, _bar;
 
-  var Foo = function Foo() {
-    babelHelpers.classCallCheck(this, Foo);
+  return _temp = _class = class Foo {
+    constructor() {
+      _foo.set(this, {
+        writable: true,
+        value: "foo"
+      });
+    }
 
-    _foo.set(this, "foo");
-  };
+    instance() {
+      return babelHelpers.classPrivateFieldGet(this, _foo);
+    }
 
-  _bar = new WeakMap();
+    static() {
+      return babelHelpers.classStaticPrivateFieldSpecGet(Foo, _class, _bar);
+    }
 
-  _bar.set(Foo, "bar");
+    static instance(inst) {
+      return babelHelpers.classPrivateFieldGet(inst, _foo);
+    }
 
-  _foo = new WeakMap();
+    static static() {
+      return babelHelpers.classStaticPrivateFieldSpecGet(Foo, _class, _bar);
+    }
+
+  }, _foo = new WeakMap(), _bar = {
+    writable: true,
+    value: "bar"
+  }, _temp;
 }

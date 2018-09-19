@@ -1,18 +1,10 @@
-var _property, _property2;
-
-export var MyClass = function MyClass() {
-  babelHelpers.classCallCheck(this, MyClass);
+export class MyClass {}
+var _property = {
+  writable: true,
+  value: value
 };
-_property = new WeakMap();
-
-_property.set(MyClass, value);
-
-var MyClass2 = function MyClass2() {
-  babelHelpers.classCallCheck(this, MyClass2);
+export default class MyClass2 {}
+var _property2 = {
+  writable: true,
+  value: value
 };
-
-_property2 = new WeakMap();
-
-_property2.set(MyClass2, value);
-
-export { MyClass2 as default };

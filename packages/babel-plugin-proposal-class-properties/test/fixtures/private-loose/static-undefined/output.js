@@ -1,10 +1,16 @@
-var _bar;
+class Foo {
+  static test() {
+    return babelHelpers.classPrivateFieldLooseBase(Foo, _bar)[_bar];
+  }
 
-var Foo = function Foo() {
-  babelHelpers.classCallCheck(this, Foo);
-};
+  test() {
+    return babelHelpers.classPrivateFieldLooseBase(Foo, _bar)[_bar];
+  }
 
-_bar = babelHelpers.classPrivateFieldKey("bar");
+}
+
+var _bar = babelHelpers.classPrivateFieldLooseKey("bar");
+
 Object.defineProperty(Foo, _bar, {
   writable: true,
   value: void 0

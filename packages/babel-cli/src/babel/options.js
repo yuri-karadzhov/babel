@@ -28,6 +28,11 @@ commander.option(
   "The name of the 'env' to use when loading configs and plugins. " +
     "Defaults to the value of BABEL_ENV, or else NODE_ENV, or else 'development'.",
 );
+commander.option(
+  "--root-mode [mode]",
+  "The project-root resolution mode. " +
+    "One of 'root' (the default), 'upward', or 'upward-optional'.",
+);
 
 // Basic file input configuration.
 commander.option("--source-type [script|module]", "");
@@ -162,20 +167,20 @@ export default function parseArgv(args: Array<string>) {
 
   filenames.forEach(function(filename) {
     if (!fs.existsSync(filename)) {
-      errors.push(filename + " doesn't exist");
+      errors.push(filename + " does not exist");
     }
   });
 
   if (commander.outDir && !filenames.length) {
-    errors.push("filenames required for --out-dir");
+    errors.push("--out-dir requires filenames");
   }
 
   if (commander.outFile && commander.outDir) {
-    errors.push("cannot have --out-file and --out-dir");
+    errors.push("--out-file and --out-dir cannot be used together");
   }
 
   if (commander.relative && !commander.outDir) {
-    errors.push("output directory required for --relative");
+    errors.push("--relative requires --out-dir usage");
   }
 
   if (commander.watch) {
@@ -207,7 +212,10 @@ export default function parseArgv(args: Array<string>) {
   }
 
   if (errors.length) {
-    console.error(errors.join(". "));
+    console.error("babel:");
+    errors.forEach(function(e) {
+      console.error("  " + e);
+    });
     process.exit(2);
   }
 
@@ -217,6 +225,7 @@ export default function parseArgv(args: Array<string>) {
     babelOptions: {
       presets: opts.presets,
       plugins: opts.plugins,
+      rootMode: opts.rootMode,
       configFile: opts.configFile,
       envName: opts.envName,
       sourceType: opts.sourceType,

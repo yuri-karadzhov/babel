@@ -6,6 +6,7 @@ import sourceMap from "source-map";
 import { codeFrameColumns } from "@babel/code-frame";
 import defaults from "lodash/defaults";
 import includes from "lodash/includes";
+import escapeRegExp from "lodash/escapeRegExp";
 import * as helpers from "./helpers";
 import extend from "lodash/extend";
 import merge from "lodash/merge";
@@ -117,8 +118,11 @@ function wrapPackagesArray(type, names, optionsDir) {
 
       val[0] = path.resolve(optionsDir, val[0]);
     } else {
-      // check node_modules/babel-x-y
-      val[0] = __dirname + "/../../babel-" + type + "-" + val[0];
+      const monorepoPath = __dirname + "/../../babel-" + type + "-" + val[0];
+
+      if (fs.existsSync(monorepoPath)) {
+        val[0] = monorepoPath;
+      }
     }
 
     return val;
@@ -126,9 +130,6 @@ function wrapPackagesArray(type, names, optionsDir) {
 }
 
 function checkDuplicatedNodes(ast) {
-  // TODO Remove all these function when regenerator doesn't
-  // insert duplicated nodes
-
   const nodes = new WeakSet();
   const parents = new WeakMap();
 
@@ -152,156 +153,15 @@ function checkDuplicatedNodes(ast) {
     }
   };
 
-  const parentIs = (node, test) => {
-    return (parents.get(node) || []).some(parent => test(parent));
-  };
-  const isByRegenerator = node => {
-    if (!node) {
-      return false;
-    } else if (node.type === "Identifier") {
-      if (/^_(?:context|value|callee|marked)\d*$/.test(node.name)) {
-        return true;
-      } else if (
-        /^t\d+$/.test(node.name) &&
-        parentIs(
-          node,
-          parent =>
-            parent.type === "MemberExpression" &&
-            isByRegenerator(parent.object),
-        )
-      ) {
-        // _context.t* // <-- t*
-        return true;
-      } else if (
-        parentIs(
-          node,
-          parent =>
-            parent.type === "VariableDeclarator" &&
-            parentIs(
-              parent,
-              parent =>
-                parent.type === "VariableDeclaration" &&
-                parentIs(
-                  parent,
-                  parent =>
-                    parent.type === "BlockStatement" &&
-                    parentIs(
-                      parent,
-                      parent =>
-                        parent.type === "FunctionExpression" &&
-                        isByRegenerator(parent.id),
-                    ),
-                ),
-            ),
-        )
-      ) {
-        // regeneratorRuntime.mark(function _callee3() {
-        //   var bar, _bar2; // <-- Those identifiers
-        return true;
-      } else if (
-        parentIs(
-          node,
-          parent =>
-            parent.type === "VariableDeclarator" &&
-            parentIs(
-              parent,
-              parent =>
-                parent.type === "VariableDeclaration" &&
-                parentIs(
-                  parent,
-                  parent =>
-                    parent.type === "BlockStatement" &&
-                    parent.body.length === 2 &&
-                    parent.body[1].type === "ReturnStatement" &&
-                    parent.body[1].argument.type === "CallExpression" &&
-                    parent.body[1].argument.callee.type ===
-                      "MemberExpression" &&
-                    parent.body[1].argument.callee.property.type ===
-                      "Identifier" &&
-                    parent.body[1].argument.callee.property.name === "wrap",
-                ),
-            ),
-        )
-      ) {
-        // function foo() {
-        //   var _len, // <-- Those identifiers
-        //     items,
-        //     _key,
-        //     _args = arguments;
-        //   return regeneratorRuntime.wrap(function foo$(_context) {
-        return true;
-      } else if (
-        parentIs(
-          node,
-          parent =>
-            parent.type === "CallExpression" &&
-            parent.arguments.length === 3 &&
-            parent.arguments[1] === node &&
-            parent.callee.type === "MemberExpression" &&
-            parent.callee.property.type === "Identifier" &&
-            parent.callee.property.name === "wrap",
-        )
-      ) {
-        // regeneratorRuntime.wrap(function foo$(_context) {
-        //   ...
-        // }, foo, this); // <- foo
-        return true;
-      } else if (
-        parentIs(
-          node,
-          parent =>
-            parent.type === "CallExpression" &&
-            parent.callee.type === "MemberExpression" &&
-            parent.callee.property.type === "Identifier" &&
-            parent.callee.property.name === "mark",
-        )
-      ) {
-        // regeneratorRuntime.mark(foo); // foo
-        return true;
-      }
-    } else if (node.type === "MemberExpression") {
-      // _context.next
-      return isByRegenerator(node.object);
-    } else if (node.type === "CallExpression") {
-      return isByRegenerator(node.callee);
-    } else if (node.type === "AssignmentExpression") {
-      // _context.next = 4;
-      return isByRegenerator(node.left);
-    } else if (node.type === "NumericLiteral") {
-      if (
-        parentIs(
-          node,
-          parent =>
-            parent.type === "AssignmentExpression" &&
-            isByRegenerator(parent.left),
-        )
-      ) {
-        // _context.next = 4; // <-- The 4
-        return true;
-      } else if (
-        parentIs(
-          node,
-          parent =>
-            parent.type === "CallExpression" &&
-            parent.callee.type === "MemberExpression" &&
-            isByRegenerator(parent.callee.object),
-        )
-      ) {
-        // return _context.abrupt("break", 11); // <-- The 11
-        return true;
-      }
-    }
-    return false;
-  };
   const hidePrivateProperties = (key, val) => {
     // Hides properties like _shadowedFunctionLiteral,
     // which makes the AST circular
     if (key[0] === "_") return "[Private]";
     return val;
   };
+
   babel.types.traverseFast(ast, node => {
     registerChildren(node);
-    if (isByRegenerator(node)) return;
     if (nodes.has(node)) {
       throw new Error(
         "Do not reuse nodes. Use `t.cloneNode` to copy them.\n" +
@@ -324,7 +184,7 @@ function run(task) {
   function getOpts(self) {
     const newOpts = merge(
       {
-        cwd: path.dirname(self.filename),
+        cwd: path.dirname(self.loc),
         filename: self.loc,
         filenameRelative: self.filename,
         sourceFileName: self.filename,
@@ -379,10 +239,15 @@ function run(task) {
   const expectCode = expected.code;
   if (!execCode || actualCode) {
     result = babel.transform(actualCode, getOpts(actual));
+    const expectedCode = result.code.replace(
+      escapeRegExp(path.resolve(__dirname, "../../../")),
+      "<CWD>",
+    );
+
     checkDuplicatedNodes(result.ast);
     if (
       !expected.code &&
-      result.code &&
+      expectedCode &&
       !opts.throws &&
       fs.statSync(path.dirname(expected.loc)).isDirectory() &&
       !process.env.CI
@@ -393,7 +258,7 @@ function run(task) {
       );
 
       console.log(`New test file created: ${expectedFile}`);
-      fs.writeFileSync(expectedFile, `${result.code}\n`);
+      fs.writeFileSync(expectedFile, `${expectedCode}\n`);
 
       if (expected.loc !== expectedFile) {
         try {
@@ -401,7 +266,7 @@ function run(task) {
         } catch (e) {}
       }
     } else {
-      actualCode = result.code.trim();
+      actualCode = expectedCode.trim();
       try {
         expect(actualCode).toEqualFile({
           filename: expected.loc,
@@ -411,7 +276,7 @@ function run(task) {
         if (!process.env.OVERWRITE) throw e;
 
         console.log(`Updated test file: ${expected.loc}`);
-        fs.writeFileSync(expected.loc, `${result.code}\n`);
+        fs.writeFileSync(expected.loc, `${expectedCode}\n`);
       }
 
       if (actualCode) {
@@ -489,44 +354,44 @@ export default function(
           continue;
         }
 
-        it(
+        const testFn = task.disabled ? it.skip : it;
+
+        testFn(
           task.title,
-          !task.disabled &&
-            function() {
-              function runTask() {
-                run(task);
-              }
 
-              defaults(task.options, {
-                sourceMap: !!(task.sourceMappings || task.sourceMap),
+          function() {
+            function runTask() {
+              run(task);
+            }
+
+            defaults(task.options, {
+              sourceMap: !!(task.sourceMappings || task.sourceMap),
+            });
+
+            extend(task.options, taskOpts);
+
+            if (dynamicOpts) dynamicOpts(task.options, task);
+
+            const throwMsg = task.options.throws;
+            if (throwMsg) {
+              // internal api doesn't have this option but it's best not to pollute
+              // the options object with useless options
+              delete task.options.throws;
+
+              assert.throws(runTask, function(err) {
+                return throwMsg === true || err.message.indexOf(throwMsg) >= 0;
               });
-
-              extend(task.options, taskOpts);
-
-              if (dynamicOpts) dynamicOpts(task.options, task);
-
-              const throwMsg = task.options.throws;
-              if (throwMsg) {
-                // internal api doesn't have this option but it's best not to pollute
-                // the options object with useless options
-                delete task.options.throws;
-
-                assert.throws(runTask, function(err) {
-                  return (
-                    throwMsg === true || err.message.indexOf(throwMsg) >= 0
-                  );
-                });
-              } else {
-                if (task.exec.code) {
-                  const result = run(task);
-                  if (result && typeof result.then === "function") {
-                    return result;
-                  }
-                } else {
-                  runTask();
+            } else {
+              if (task.exec.code) {
+                const result = run(task);
+                if (result && typeof result.then === "function") {
+                  return result;
                 }
+              } else {
+                runTask();
               }
-            },
+            }
+          },
         );
       }
     });

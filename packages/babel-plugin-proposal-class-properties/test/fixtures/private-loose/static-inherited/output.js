@@ -1,55 +1,41 @@
-var _foo, _foo2;
-
-var Base =
-/*#__PURE__*/
-function () {
-  function Base() {
-    babelHelpers.classCallCheck(this, Base);
+class Base {
+  static getThis() {
+    return babelHelpers.classPrivateFieldLooseBase(this, _foo)[_foo];
   }
 
-  babelHelpers.createClass(Base, null, [{
-    key: "m",
-    value: function m() {
-      return babelHelpers.classPrivateFieldBase(this, _foo)[_foo];
-    }
-  }]);
-  return Base;
-}();
+  static updateThis(val) {
+    return babelHelpers.classPrivateFieldLooseBase(this, _foo)[_foo] = val;
+  }
 
-_foo = babelHelpers.classPrivateFieldKey("foo");
+  static getClass() {
+    return babelHelpers.classPrivateFieldLooseBase(Base, _foo)[_foo];
+  }
+
+  static updateClass(val) {
+    return babelHelpers.classPrivateFieldLooseBase(Base, _foo)[_foo] = val;
+  }
+
+}
+
+var _foo = babelHelpers.classPrivateFieldLooseKey("foo");
+
 Object.defineProperty(Base, _foo, {
   writable: true,
   value: 1
 });
 
-var Sub1 =
-/*#__PURE__*/
-function (_Base) {
-  babelHelpers.inherits(Sub1, _Base);
-
-  function Sub1() {
-    babelHelpers.classCallCheck(this, Sub1);
-    return babelHelpers.possibleConstructorReturn(this, (Sub1.__proto__ || Object.getPrototypeOf(Sub1)).apply(this, arguments));
+class Sub1 extends Base {
+  static update(val) {
+    return babelHelpers.classPrivateFieldLooseBase(this, _foo2)[_foo2] = val;
   }
 
-  return Sub1;
-}(Base);
+}
 
-_foo2 = babelHelpers.classPrivateFieldKey("foo");
+var _foo2 = babelHelpers.classPrivateFieldLooseKey("foo");
+
 Object.defineProperty(Sub1, _foo2, {
   writable: true,
   value: 2
 });
 
-var Sub2 =
-/*#__PURE__*/
-function (_Base2) {
-  babelHelpers.inherits(Sub2, _Base2);
-
-  function Sub2() {
-    babelHelpers.classCallCheck(this, Sub2);
-    return babelHelpers.possibleConstructorReturn(this, (Sub2.__proto__ || Object.getPrototypeOf(Sub2)).apply(this, arguments));
-  }
-
-  return Sub2;
-}(Base);
+class Sub2 extends Base {}

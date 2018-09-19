@@ -36,6 +36,15 @@ describe("normalize-options", () => {
     });
   });
 
+  describe("Config format validation", () => {
+    it("should throw if top-level option not found", () => {
+      const unknownTopLevelOption = () => {
+        normalizeOptions({ unknown: "option" });
+      };
+      expect(unknownTopLevelOption).toThrow();
+    });
+  });
+
   describe("RegExp include/exclude", () => {
     it("should not allow invalid plugins in `include` and `exclude`", () => {
       const normalizeWithNonExistingPlugin = () => {
@@ -125,16 +134,20 @@ describe("normalize-options", () => {
   });
 
   describe("validateModulesOption", () => {
-    it("`undefined` option returns commonjs", () => {
-      expect(validateModulesOption()).toBe("commonjs");
+    it("`undefined` option returns auto", () => {
+      expect(validateModulesOption()).toBe("auto");
     });
 
-    it("`false` option returns commonjs", () => {
+    it("`false` option returns false", () => {
       expect(validateModulesOption(false)).toBe(false);
     });
 
+    it("auto option is valid", () => {
+      expect(validateModulesOption("auto")).toBe("auto");
+    });
+
     it("commonjs option is valid", () => {
-      expect(validateModulesOption()).toBe("commonjs");
+      expect(validateModulesOption("commonjs")).toBe("commonjs");
     });
 
     it("systemjs option is valid", () => {

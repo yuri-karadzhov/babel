@@ -5,11 +5,18 @@ import Plugin from "../lib/config/plugin";
 import generator from "@babel/generator";
 
 function assertIgnored(result) {
-  expect(result).toBeFalsy();
+  expect(result).toBeNull();
 }
 
 function assertNotIgnored(result) {
-  expect(result.ignored).toBeFalsy();
+  expect(result).not.toBeNull();
+}
+
+function parse(code, opts) {
+  return babel.parse(code, {
+    cwd: __dirname,
+    ...opts,
+  });
 }
 
 function transform(code, opts) {
@@ -36,13 +43,18 @@ function transformFileSync(filename, opts) {
   });
 }
 
-// shim
 function transformAsync(code, opts) {
-  return {
-    then: function(resolve) {
-      resolve(transform(code, opts));
-    },
-  };
+  return babel.transformAsync(code, {
+    cwd: __dirname,
+    ...opts,
+  });
+}
+
+function transformFromAst(ast, code, opts) {
+  return babel.transformFromAst(ast, code, {
+    cwd: __dirname,
+    ...opts,
+  });
 }
 
 describe("parser and generator options", function() {
@@ -170,6 +182,30 @@ describe("api", function() {
     expect(options).toEqual({ babelrc: false });
   });
 
+  it("transformFromAst should not mutate the AST", function() {
+    const program = "const identifier = 1";
+    const node = parse(program);
+    const { code } = transformFromAst(node, program, {
+      plugins: [
+        function() {
+          return {
+            visitor: {
+              Identifier: function(path) {
+                path.node.name = "replaced";
+              },
+            },
+          };
+        },
+      ],
+    });
+
+    expect(code).toBe("const replaced = 1;");
+    expect(node.program.body[0].declarations[0].id.name).toBe(
+      "identifier",
+      "original ast should not have been mutated",
+    );
+  });
+
   it("options throw on falsy true", function() {
     return expect(function() {
       transform("", {
@@ -180,7 +216,7 @@ describe("api", function() {
 
   it("options merge backwards", function() {
     return transformAsync("", {
-      presets: [__dirname + "/../../babel-preset-es2015"],
+      presets: [__dirname + "/../../babel-preset-env"],
       plugins: [__dirname + "/../../babel-plugin-syntax-jsx"],
     }).then(function(result) {
       expect(result.options.plugins[0].manipulateOptions.toString()).toEqual(
@@ -259,8 +295,8 @@ describe("api", function() {
             };
           },
 
-          // ES2015 preset
-          require(__dirname + "/../../babel-preset-es2015"),
+          // env preset
+          require(__dirname + "/../../babel-preset-env"),
 
           // Third preset for Flow.
           function() {

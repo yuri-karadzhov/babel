@@ -1,26 +1,18 @@
-var _bar;
-
-var Foo =
-/*#__PURE__*/
-function () {
-  function Foo() {
-    babelHelpers.classCallCheck(this, Foo);
+class Foo {
+  static test() {
+    return babelHelpers.classStaticPrivateFieldSpecGet(Foo, Foo, _bar);
   }
 
-  babelHelpers.createClass(Foo, [{
-    key: "test",
-    value: function test() {
-      return babelHelpers.classPrivateFieldGet(Foo, _bar);
-    }
-  }], [{
-    key: "test",
-    value: function test() {
-      return babelHelpers.classPrivateFieldGet(Foo, _bar);
-    }
-  }]);
-  return Foo;
-}();
+  test() {
+    return babelHelpers.classStaticPrivateFieldSpecGet(Foo, Foo, _bar);
+  }
 
-_bar = new WeakMap();
+}
 
-_bar.set(Foo, "foo");
+var _bar = {
+  writable: true,
+  value: "foo"
+};
+expect("bar" in Foo).toBe(false);
+expect(Foo.test()).toBe("foo");
+expect(Foo.test()).toBe("foo");

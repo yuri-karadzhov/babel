@@ -563,20 +563,39 @@ export default class ExpressionParser extends LValParser {
       }
       return node;
     } else if (this.match(tt.backQuote)) {
-      const node = this.startNodeAt(startPos, startLoc);
-      node.tag = base;
-      node.quasi = this.parseTemplate(true);
-      if (state.optionalChainMember) {
-        this.raise(
-          startPos,
-          "Tagged Template Literals are not allowed in optionalChain",
-        );
-      }
-      return this.finishNode(node, "TaggedTemplateExpression");
+      return this.parseTaggedTemplateExpression(
+        startPos,
+        startLoc,
+        base,
+        state,
+      );
     } else {
       state.stop = true;
       return base;
     }
+  }
+
+  parseTaggedTemplateExpression(
+    startPos: number,
+    startLoc: Position,
+    base: N.Expression,
+    state: N.ParseSubscriptState,
+    typeArguments?: ?N.TsTypeParameterInstantiation,
+  ): N.TaggedTemplateExpression {
+    const node: N.TaggedTemplateExpression = this.startNodeAt(
+      startPos,
+      startLoc,
+    );
+    node.tag = base;
+    node.quasi = this.parseTemplate(true);
+    if (typeArguments) node.typeParameters = typeArguments;
+    if (state.optionalChainMember) {
+      this.raise(
+        startPos,
+        "Tagged Template Literals are not allowed in optionalChain",
+      );
+    }
+    return this.finishNode(node, "TaggedTemplateExpression");
   }
 
   atPossibleAsync(base: N.Expression): boolean {
@@ -964,7 +983,7 @@ export default class ExpressionParser extends LValParser {
       } else if (!this.hasPlugin("importMeta")) {
         this.raise(
           id.start,
-          `Dynamic imports require a parameter: import('a.js').then`,
+          `Dynamic imports require a parameter: import('a.js')`,
         );
       }
     }
@@ -1131,9 +1150,8 @@ export default class ExpressionParser extends LValParser {
 
   parseParenItem(
     node: N.Expression,
-    startPos: number,
-    // eslint-disable-next-line no-unused-vars
-    startLoc: Position,
+    startPos: number, // eslint-disable-line no-unused-vars
+    startLoc: Position, // eslint-disable-line no-unused-vars
   ): N.Expression {
     return node;
   }

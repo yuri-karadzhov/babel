@@ -1,9 +1,15 @@
-var _bar;
+class Foo {
+  static test() {
+    return babelHelpers.classStaticPrivateFieldSpecGet(Foo, Foo, _bar);
+  }
 
-var Foo = function Foo() {
-  babelHelpers.classCallCheck(this, Foo);
+  test() {
+    return babelHelpers.classStaticPrivateFieldSpecGet(Foo, Foo, _bar);
+  }
+
+}
+
+var _bar = {
+  writable: true,
+  value: void 0
 };
-
-_bar = new WeakMap();
-
-_bar.set(Foo, void 0);

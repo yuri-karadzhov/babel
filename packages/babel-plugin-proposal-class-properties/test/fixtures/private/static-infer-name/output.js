@@ -1,5 +1,6 @@
-var _num, _class, _temp;
+var _class, _temp, _num;
 
-var Foo = (_temp = _class = function Foo() {
-  babelHelpers.classCallCheck(this, Foo);
-}, _num = new WeakMap(), _num.set(_class, 0), _temp);
+var Foo = (_temp = _class = class Foo {}, _num = {
+  writable: true,
+  value: 0
+}, _temp);

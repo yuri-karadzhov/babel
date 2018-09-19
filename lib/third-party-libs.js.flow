@@ -32,6 +32,20 @@ declare module "lodash/merge" {
   declare export default <T: Object>(T, Object) => T;
 }
 
+declare module "semver" {
+  declare module.exports: {
+    valid(v: string): boolean;
+    gt(v1: string, v2: string): boolean;
+    lt(v1: string, v2: string): boolean;
+    major(v: string): number;
+    minor(v: string): number;
+    patch(v: string): number;
+    satisfies(v1: string, r1: string): boolean;
+
+    intersects(r1: string, r2: string): boolean;
+  }
+}
+
 declare module "source-map" {
   declare export type SourceMap = {
     version: 3,
@@ -160,9 +174,15 @@ declare module "convert-source-map" {
     fromComment(str: string): Converter,
     fromMapFileComment(str: string): Converter,
     fromSource(str: string): Converter,
-    fromMapFileSource(str: string): Converter,
+    fromMapFileSource(str: string, dir: string): Converter,
     removeComments(str: string): string,
     removeMapFileComments(str: string): string,
     generateMapFileComment(path: string, options?: ?{ multiline: boolean }): string,
+  };
+}
+
+declare module "js-levenshtein" {
+  declare module.exports: {
+    (string, string): number,
   };
 }

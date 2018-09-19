@@ -2,7 +2,9 @@ import * as t from "@babel/types";
 import jsesc from "jsesc";
 
 export function Identifier(node: Object) {
-  this.word(node.name);
+  this.exactSource(node.loc, () => {
+    this.word(node.name);
+  });
 }
 
 export function RestElement(node: Object) {
@@ -132,10 +134,7 @@ export function StringLiteral(node: Object) {
   }
 
   // ensure the output is ASCII-safe
-  const opts = {
-    quotes: "double",
-    wrap: true,
-  };
+  const opts = this.format.jsescOption;
   if (this.format.jsonCompatibleStrings) {
     opts.json = true;
   }
