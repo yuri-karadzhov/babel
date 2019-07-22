@@ -12,20 +12,135 @@ const pfs = {
 
 const parse = require("../../../packages/babel-parser").parse;
 
+const ignoredFeatures = [
+  "Array.prototype.flat",
+  "Array.prototype.flatMap",
+  "Array.prototype.values",
+  "ArrayBuffer",
+  "async-functions",
+  "async-iteration",
+  "arrow-function",
+  "Atomics",
+  "caller",
+  "class",
+  "computed-property-names",
+  "const",
+  "cross-realm",
+  "DataView",
+  "DataView.prototype.getFloat32",
+  "DataView.prototype.getFloat64",
+  "DataView.prototype.getInt8",
+  "DataView.prototype.getInt16",
+  "DataView.prototype.getInt32",
+  "DataView.prototype.getUint16",
+  "DataView.prototype.getUint32",
+  "DataView.prototype.setUint8",
+  "default-parameters",
+  "destructuring-assignment",
+  "destructuring-binding",
+  "Float32Array",
+  "Float64Array",
+  "for-of",
+  "generators",
+  "globalThis",
+  "hashbang",
+  "Int8Array",
+  "Int32Array",
+  "Intl.ListFormat",
+  "Intl.Locale",
+  "Intl.NumberFormat-unified",
+  "Intl.RelativeTimeFormat",
+  "Intl.Segmenter",
+  "IsHTMLDDA",
+  "json-superset",
+  "let",
+  "Map",
+  "new.target",
+  "Object.fromEntries",
+  "Object.is",
+  "object-rest",
+  "object-spread",
+  "optional-catch-binding",
+  "Promise.prototype.finally",
+  "Proxy",
+  "Reflect",
+  "Reflect.construct",
+  "Reflect.set",
+  "Reflect.setPrototypeOf",
+  "regexp-dotall",
+  "regexp-lookbehind",
+  "regexp-named-groups",
+  "regexp-unicode-property-escapes",
+  "SharedArrayBuffer",
+  "Set",
+  "String.fromCodePoint",
+  "String.prototype.endsWith",
+  "String.prototype.includes",
+  "String.prototype.matchAll",
+  "String.prototype.trimEnd",
+  "String.prototype.trimStart",
+  "string-trimming",
+  "super",
+  "Symbol",
+  "Symbol.asyncIterator",
+  "Symbol.hasInstance",
+  "Symbol.isConcatSpreadable",
+  "Symbol.iterator",
+  "Symbol.match",
+  "Symbol.matchAll",
+  "Symbol.prototype.description",
+  "Symbol.replace",
+  "Symbol.search",
+  "Symbol.split",
+  "Symbol.species",
+  "Symbol.toPrimitive",
+  "Symbol.toStringTag",
+  "Symbol.unscopables",
+  "tail-call-optimization",
+  "template",
+  "TypedArray",
+  "u180e",
+  "Uint8Array",
+  "Uint8ClampedArray",
+  "Uint16Array",
+  "WeakMap",
+  "WeakSet",
+  "well-formed-json-stringify",
+];
+
 const featuresToPlugins = {
   BigInt: "bigInt",
-  "class-fields-public": "classProperties",
   "class-fields-private": "classPrivateProperties",
-  "async-iteration": "asyncGenerators",
-  "object-rest": "objectRestSpread",
-  "object-spread": "objectRestSpread",
-  "optional-catch-binding": "optionalCatchBinding",
+  "class-fields-public": "classProperties",
+  "class-methods-private": "classPrivateMethods",
+  "class-static-fields-public": "classProperties",
+  "class-static-fields-private": "classPrivateProperties",
+  "class-static-methods-private": "classPrivateMethods",
+  "dynamic-import": "dynamicImport",
+  "export-star-as-namespace-from-module": "exportNamespaceFrom",
+  "import.meta": "importMeta",
   "numeric-separator-literal": "numericSeparator",
 };
 
 function getPlugins(features) {
-  return features && features.map(f => featuresToPlugins[f]).filter(Boolean);
+  return (
+    features &&
+    features
+      .map(f => {
+        if (!featuresToPlugins[f] && !ignoredFeatures.includes(f)) {
+          unmappedFeatures.add(f);
+        }
+        return featuresToPlugins[f];
+      })
+      .filter(Boolean)
+  );
 }
+
+const unmappedFeatures = new Set();
+
+exports.getUnmappedFeatures = function() {
+  return unmappedFeatures;
+};
 
 exports.getTests = function(testDir) {
   const stream = new TestStream(testDir, {
@@ -95,7 +210,8 @@ exports.updateWhitelist = function(filename, summary) {
       .concat(summary.disallowed.failure)
       .map(function(test) {
         return test.id;
-      });
+      })
+      .concat(summary.unrecognized);
     const toAdd = summary.disallowed.falsePositive
       .concat(summary.disallowed.falseNegative)
       .map(function(test) {
@@ -113,9 +229,10 @@ exports.updateWhitelist = function(filename, summary) {
         return line;
       })
       .filter(function(line) {
-        return line !== null;
+        return line !== null && line !== "";
       })
       .concat(toAdd)
+      .sort()
       .join("\n");
 
     return pfs.writeFile(filename, newContents, "utf-8");

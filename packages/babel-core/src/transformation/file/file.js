@@ -183,7 +183,7 @@ export default class File {
     // and this fails because a prerelease version can only satisfy a range
     // if it is a prerelease within the same major/minor/patch range.
     //
-    // Note: If this is found to have issues, please also revist the logic in
+    // Note: If this is found to have issues, please also revisit the logic in
     // transform-runtime's definitions.js file.
     if (semver.valid(versionRange)) versionRange = `^${versionRange}`;
 
@@ -202,6 +202,9 @@ export default class File {
       const res = generator(name);
       if (res) return res;
     }
+
+    // make sure that the helper exists
+    helpers.ensure(name);
 
     const uid = (this.declarations[name] = this.scope.generateUidIdentifier(
       name,

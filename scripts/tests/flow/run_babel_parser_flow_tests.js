@@ -98,7 +98,7 @@ function update_whitelist(summary) {
       );
     });
 
-  const newLines = disallowed
+  const newLines = summary.disallowed.failure
     .map(({ test }) => test.file)
     .filter(test => oldLines.indexOf(test) === -1);
 
@@ -109,13 +109,15 @@ function update_whitelist(summary) {
 
 const options = {
   plugins: [
-    "asyncGenerators",
     "dynamicImport",
     ["flow", { all: true }],
     "flowComments",
     "jsx",
-    "objectRestSpread",
+    "classProperties",
     "classPrivateProperties",
+    "classPrivateMethods",
+    "bigInt",
+    "numericSeparator",
   ],
   sourceType: "module",
   ranges: true,
@@ -129,6 +131,7 @@ const flowOptionsMapping = {
   esproposal_nullish_coalescing: "nullishCoalescingOperator",
   esproposal_optional_chaining: "optionalChaining",
   types: "flowComments",
+  intern_comments: false,
 };
 
 const summary = {
@@ -171,10 +174,12 @@ tests.forEach(section => {
           }
           return;
         }
-        if (!flowOptionsMapping[option]) {
+        if (!(option in flowOptionsMapping)) {
           throw new Error("Parser options not mapped " + option);
         }
-        babelParserOptions.plugins.push(flowOptionsMapping[option]);
+        if (flowOptionsMapping[option]) {
+          babelParserOptions.plugins.push(flowOptionsMapping[option]);
+        }
       });
     }
 

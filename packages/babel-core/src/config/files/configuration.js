@@ -10,7 +10,7 @@ import {
   makeWeakCache,
   type CacheConfigurator,
 } from "../caching";
-import makeAPI from "../helpers/config-api";
+import makeAPI, { type PluginAPI } from "../helpers/config-api";
 import { makeStaticFileCache } from "./utils";
 import pathPatternToRegex from "../pattern-to-regex";
 import type { FilePackageData, RelativeConfig, ConfigFile } from "./types";
@@ -114,7 +114,7 @@ export function findRootConfig(
 
   const conf = readConfig(filepath, envName, caller);
   if (conf) {
-    debug("Found root config %o in $o.", BABEL_CONFIG_JS_FILENAME, dirname);
+    debug("Found root config %o in %o.", BABEL_CONFIG_JS_FILENAME, dirname);
   }
   return conf;
 }
@@ -132,7 +132,7 @@ export function loadConfig(
     throw new Error(`Config file ${filepath} contains no configuration data`);
   }
 
-  debug("Loaded config %o from $o.", name, dirname);
+  debug("Loaded config %o from %o.", name, dirname);
   return conf;
 }
 
@@ -150,7 +150,7 @@ const LOADING_CONFIGS = new Set();
 
 const readConfigJS = makeStrongCache(
   (
-    filepath,
+    filepath: string,
     cache: CacheConfigurator<{
       envName: string,
       caller: CallerMetadata | void,
@@ -193,7 +193,7 @@ const readConfigJS = makeStrongCache(
     }
 
     if (typeof options === "function") {
-      options = options(makeAPI(cache));
+      options = ((options: any): (api: PluginAPI) => {})(makeAPI(cache));
 
       if (!cache.configured()) throwConfigError();
     }

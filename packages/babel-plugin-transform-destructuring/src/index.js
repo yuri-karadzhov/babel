@@ -44,13 +44,36 @@ export default declare((api, options) => {
     return false;
   }
 
-  const arrayUnpackVisitor = {
-    ReferencedIdentifier(path, state) {
-      if (state.bindings[path.node.name]) {
-        state.deopt = true;
-        path.stop();
+  /**
+   * Test if an ObjectPattern's elements contain any RestElements.
+   */
+
+  function hasObjectRest(pattern) {
+    for (const elem of (pattern.properties: Array)) {
+      if (t.isRestElement(elem)) {
+        return true;
       }
-    },
+    }
+    return false;
+  }
+
+  const STOP_TRAVERSAL = {};
+
+  // NOTE: This visitor is meant to be used via t.traverse
+  const arrayUnpackVisitor = (node, ancestors, state) => {
+    if (!ancestors.length) {
+      // Top-level node: this is the array literal.
+      return;
+    }
+
+    if (
+      t.isIdentifier(node) &&
+      t.isReferenced(node, ancestors[ancestors.length - 1]) &&
+      state.bindings[node.name]
+    ) {
+      state.deopt = true;
+      throw STOP_TRAVERSAL;
+    }
   };
 
   class DestructuringTransformer {
@@ -73,7 +96,11 @@ export default declare((api, options) => {
 
       if (op) {
         node = t.expressionStatement(
-          t.assignmentExpression(op, id, t.cloneNode(init)),
+          t.assignmentExpression(
+            op,
+            id,
+            t.cloneNode(init) || this.scope.buildUndefinedNode(),
+          ),
         );
       } else {
         node = t.variableDeclaration(this.kind, [
@@ -160,7 +187,8 @@ export default declare((api, options) => {
     pushObjectRest(pattern, objRef, spreadProp, spreadPropIndex) {
       // get all the keys that appear in this object before the current spread
 
-      let keys = [];
+      const keys = [];
+      let allLiteral = true;
 
       for (let i = 0; i < pattern.properties.length; i++) {
         const prop = pattern.properties[i];
@@ -172,11 +200,17 @@ export default declare((api, options) => {
         // ignore other spread properties
         if (t.isRestElement(prop)) continue;
 
-        let key = prop.key;
+        const key = prop.key;
         if (t.isIdentifier(key) && !prop.computed) {
-          key = t.stringLiteral(prop.key.name);
+          keys.push(t.stringLiteral(key.name));
+        } else if (t.isTemplateLiteral(prop.key)) {
+          keys.push(t.cloneNode(prop.key));
+        } else if (t.isLiteral(key)) {
+          keys.push(t.stringLiteral(String(key.value)));
+        } else {
+          keys.push(t.cloneNode(key));
+          allLiteral = false;
         }
-        keys.push(t.cloneNode(key));
       }
 
       let value;
@@ -186,11 +220,18 @@ export default declare((api, options) => {
           t.cloneNode(objRef),
         ]);
       } else {
-        keys = t.arrayExpression(keys);
+        let keyExpression = t.arrayExpression(keys);
+
+        if (!allLiteral) {
+          keyExpression = t.callExpression(
+            t.memberExpression(keyExpression, t.identifier("map")),
+            [this.addHelper("toPropertyKey")],
+          );
+        }
 
         value = t.callExpression(
           this.addHelper(`objectWithoutProperties${loose ? "Loose" : ""}`),
-          [t.cloneNode(objRef), keys],
+          [t.cloneNode(objRef), keyExpression],
         );
       }
 
@@ -237,6 +278,31 @@ export default declare((api, options) => {
         objRef = temp;
       }
 
+      // Replace impure computed key expressions if we have a rest parameter
+      if (hasObjectRest(pattern)) {
+        let copiedPattern;
+        for (let i = 0; i < pattern.properties.length; i++) {
+          const prop = pattern.properties[i];
+          if (t.isRestElement(prop)) {
+            break;
+          }
+          const key = prop.key;
+          if (prop.computed && !this.scope.isPure(key)) {
+            const name = this.scope.generateUidIdentifierBasedOnNode(key);
+            this.nodes.push(this.buildVariableDeclaration(name, key));
+            if (!copiedPattern) {
+              copiedPattern = pattern = {
+                ...pattern,
+                properties: pattern.properties.slice(),
+              };
+            }
+            copiedPattern.properties[i] = {
+              ...copiedPattern.properties[i],
+              key: name,
+            };
+          }
+        }
+      }
       //
 
       for (let i = 0; i < pattern.properties.length; i++) {
@@ -282,7 +348,13 @@ export default declare((api, options) => {
       // deopt on reference to left side identifiers
       const bindings = t.getBindingIdentifiers(pattern);
       const state = { deopt: false, bindings };
-      this.scope.traverse(arr, arrayUnpackVisitor, state);
+
+      try {
+        t.traverse(arr, arrayUnpackVisitor, state);
+      } catch (e) {
+        if (e !== STOP_TRAVERSAL) throw e;
+      }
+
       return !state.deopt;
     }
 
@@ -383,6 +455,8 @@ export default declare((api, options) => {
   }
 
   return {
+    name: "transform-destructuring",
+
     visitor: {
       ExportNamedDeclaration(path) {
         const declaration = path.get("declaration");
@@ -391,7 +465,7 @@ export default declare((api, options) => {
 
         const specifiers = [];
 
-        for (const name in path.getOuterBindingIdentifiers(path)) {
+        for (const name of Object.keys(path.getOuterBindingIdentifiers(path))) {
           specifiers.push(
             t.exportSpecifier(t.identifier(name), t.identifier(name)),
           );
@@ -419,8 +493,14 @@ export default declare((api, options) => {
 
           path.ensureBlock();
 
+          if (node.body.body.length === 0 && path.isCompletionRecord()) {
+            node.body.body.unshift(
+              t.expressionStatement(scope.buildUndefinedNode()),
+            );
+          }
+
           node.body.body.unshift(
-            t.variableDeclaration("var", [t.variableDeclarator(left, temp)]),
+            t.expressionStatement(t.assignmentExpression("=", left, temp)),
           );
 
           return;
@@ -510,7 +590,12 @@ export default declare((api, options) => {
         destructuring.init(node.left, ref || node.right);
 
         if (ref) {
-          nodes.push(t.expressionStatement(t.cloneNode(ref)));
+          if (path.parentPath.isArrowFunctionExpression()) {
+            path.replaceWith(t.blockStatement([]));
+            nodes.push(t.returnStatement(t.cloneNode(ref)));
+          } else {
+            nodes.push(t.expressionStatement(t.cloneNode(ref)));
+          }
         }
 
         path.replaceWithMultiple(nodes);

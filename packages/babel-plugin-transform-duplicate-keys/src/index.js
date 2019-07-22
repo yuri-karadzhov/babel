@@ -12,6 +12,8 @@ export default declare(api => {
   api.assertVersion(7);
 
   return {
+    name: "transform-duplicate-keys",
+
     visitor: {
       ObjectExpression(path) {
         const { node } = path;
@@ -20,11 +22,11 @@ export default declare(api => {
         );
 
         // A property is a duplicate key if:
-        // * the property is a data property, and is preceeded by a data,
+        // * the property is a data property, and is preceded by a data,
         //   getter, or setter property of the same name.
-        // * the property is a getter property, and is preceeded by a data or
+        // * the property is a getter property, and is preceded by a data or
         //   getter property of the same name.
-        // * the property is a setter property, and is preceeded by a data or
+        // * the property is a setter property, and is preceded by a data or
         //   setter property of the same name.
 
         const alreadySeenData = Object.create(null);

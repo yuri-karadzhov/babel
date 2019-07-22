@@ -154,6 +154,14 @@ describe("api", function() {
     );
   });
 
+  it("exposes types", function() {
+    expect(babel.types).toBeDefined();
+  });
+
+  it("exposes the parser's token types", function() {
+    expect(babel.tokTypes).toBeDefined();
+  });
+
   it("transformFile", function(done) {
     const options = {
       babelrc: false,
@@ -769,15 +777,39 @@ describe("api", function() {
         options,
         function(err) {
           expect(err.message).toMatch(
-            "Support for the experimental syntax 'asyncGenerators' isn't currently enabled (1:15):",
+            "Support for the experimental syntax 'logicalAssignment' isn't currently enabled (1:3):",
           );
           expect(err.message).toMatch(
-            "Add @babel/plugin-proposal-async-generator-functions (https://git.io/vb4yp) to the " +
+            "Add @babel/plugin-proposal-logical-assignment-operators (https://git.io/vAlRe) to the " +
               "'plugins' section of your Babel config to enable transformation.",
           );
           done();
         },
       );
+    });
+  });
+
+  describe("missing helpers", function() {
+    it("should always throw", function() {
+      expect(() =>
+        babel.transformSync(``, {
+          configFile: false,
+          plugins: [
+            function() {
+              return {
+                visitor: {
+                  Program(path) {
+                    try {
+                      path.pushContainer("body", this.addHelper("fooBar"));
+                    } catch {}
+                    path.pushContainer("body", this.addHelper("fooBar"));
+                  },
+                },
+              };
+            },
+          ],
+        }),
+      ).toThrow();
     });
   });
 });

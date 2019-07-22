@@ -5,11 +5,12 @@ import { types as t } from "@babel/core";
 export default declare(api => {
   api.assertVersion(7);
 
-  const FLOW_DIRECTIVE = "@flow";
+  const FLOW_DIRECTIVE = /(@flow(\s+(strict(-local)?|weak))?|@noflow)/;
 
   let skipStrip = false;
 
   return {
+    name: "transform-flow-strip-types",
     inherits: syntaxFlow,
 
     visitor: {
@@ -25,15 +26,19 @@ export default declare(api => {
         skipStrip = false;
         let directiveFound = false;
 
-        for (const comment of (comments: Array<Object>)) {
-          if (comment.value.indexOf(FLOW_DIRECTIVE) >= 0) {
-            directiveFound = true;
+        if (comments) {
+          for (const comment of (comments: Array<Object>)) {
+            if (FLOW_DIRECTIVE.test(comment.value)) {
+              directiveFound = true;
 
-            // remove flow directive
-            comment.value = comment.value.replace(FLOW_DIRECTIVE, "");
+              // remove flow directive
+              comment.value = comment.value.replace(FLOW_DIRECTIVE, "");
 
-            // remove the comment completely if it only consists of whitespace and/or stars
-            if (!comment.value.replace(/\*/g, "").trim()) comment.ignore = true;
+              // remove the comment completely if it only consists of whitespace and/or stars
+              if (!comment.value.replace(/\*/g, "").trim()) {
+                comment.ignore = true;
+              }
+            }
           }
         }
 

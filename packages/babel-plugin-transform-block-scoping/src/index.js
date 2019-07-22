@@ -16,10 +16,12 @@ export default declare((api, opts) => {
     throw new Error(`.throwIfClosureRequired must be a boolean, or undefined`);
   }
   if (typeof tdzEnabled !== "boolean") {
-    throw new Error(`.throwIfClosureRequired must be a boolean, or undefined`);
+    throw new Error(`.tdz must be a boolean, or undefined`);
   }
 
   return {
+    name: "transform-block-scoping",
+
     visitor: {
       VariableDeclaration(path) {
         const { node, parent, scope } = path;
@@ -31,11 +33,13 @@ export default declare((api, opts) => {
 
           for (let i = 0; i < node.declarations.length; i++) {
             const decl = node.declarations[i];
-            if (decl.init) {
-              const assign = t.assignmentExpression("=", decl.id, decl.init);
-              assign._ignoreBlockScopingTDZ = true;
-              nodes.push(t.expressionStatement(assign));
-            }
+            const assign = t.assignmentExpression(
+              "=",
+              decl.id,
+              decl.init || scope.buildUndefinedNode(),
+            );
+            assign._ignoreBlockScopingTDZ = true;
+            nodes.push(t.expressionStatement(assign));
             decl.init = this.addHelper("temporalUndefined");
           }
 
@@ -151,8 +155,7 @@ function convertBlockScopedToVar(
   // Move bindings from current block scope to function scope.
   if (moveBindingsToParent) {
     const parentScope = scope.getFunctionParent() || scope.getProgramParent();
-    const ids = path.getBindingIdentifiers();
-    for (const name in ids) {
+    for (const name of Object.keys(path.getBindingIdentifiers())) {
       const binding = scope.getOwnBinding(name);
       if (binding) binding.kind = "var";
       scope.moveBindingTo(name, parentScope);
@@ -180,6 +183,8 @@ const letReferenceBlockVisitor = traverse.visitors.merge([
       // simply rename the variables.
       if (state.loopDepth > 0) {
         path.traverse(letReferenceFunctionVisitor, state);
+      } else {
+        path.traverse(tdzVisitor, state);
       }
       return path.skip();
     },
@@ -243,8 +248,7 @@ const loopLabelVisitor = {
 const continuationVisitor = {
   enter(path, state) {
     if (path.isAssignmentExpression() || path.isUpdateExpression()) {
-      const bindings = path.getBindingIdentifiers();
-      for (const name in bindings) {
+      for (const name of Object.keys(path.getBindingIdentifiers())) {
         if (
           state.outsideReferences[name] !==
           path.scope.getBindingIdentifier(name)
@@ -289,7 +293,7 @@ const loopVisitor = {
   },
 
   "BreakStatement|ContinueStatement|ReturnStatement"(path, state) {
-    const { node, parent, scope } = path;
+    const { node, scope } = path;
     if (node[this.LOOP_IGNORE]) return;
 
     let replace;
@@ -309,7 +313,7 @@ const loopVisitor = {
         if (state.ignoreLabeless) return;
 
         // break statements mean something different in this context
-        if (t.isBreakStatement(node) && t.isSwitchCase(parent)) return;
+        if (t.isBreakStatement(node) && state.inSwitchCase) return;
       }
 
       state.hasBreakContinue = true;
@@ -408,7 +412,7 @@ class BlockScoping {
     const scope = this.scope;
     const state = this.state;
 
-    for (const name in scope.bindings) {
+    for (const name of Object.keys(scope.bindings)) {
       const binding = scope.bindings[name];
       if (binding.kind !== "const") continue;
 
@@ -442,7 +446,7 @@ class BlockScoping {
     const parentScope = scope.getFunctionParent() || scope.getProgramParent();
     const letRefs = this.letReferences;
 
-    for (const key in letRefs) {
+    for (const key of Object.keys(letRefs)) {
       const ref = letRefs[key];
       const binding = scope.getBinding(ref.name);
       if (!binding) continue;
@@ -460,14 +464,16 @@ class BlockScoping {
 
   remap() {
     const letRefs = this.letReferences;
+    const outsideLetRefs = this.outsideLetReferences;
     const scope = this.scope;
+    const blockPathScope = this.blockPath.scope;
 
     // alright, so since we aren't wrapping this block in a closure
     // we have to check if any of our let variables collide with
     // those in upper scopes and then if they do, generate a uid
     // for them and replace all references with it
 
-    for (const key in letRefs) {
+    for (const key of Object.keys(letRefs)) {
       // just an Identifier node we collected in `getLetReferences`
       // this is the defining identifier of a declaration
       const ref = letRefs[key];
@@ -481,9 +487,18 @@ class BlockScoping {
           scope.rename(ref.name);
         }
 
-        if (this.blockPath.scope.hasOwnBinding(key)) {
-          this.blockPath.scope.rename(ref.name);
+        if (blockPathScope.hasOwnBinding(key)) {
+          blockPathScope.rename(ref.name);
         }
+      }
+    }
+
+    for (const key of Object.keys(outsideLetRefs)) {
+      const ref = letRefs[key];
+      // check for collisions with a for loop's init variable and the enclosing scope's bindings
+      // https://github.com/babel/babel/issues/8498
+      if (isInLoop(this.blockPath) && blockPathScope.hasOwnBinding(key)) {
+        blockPathScope.rename(ref.name);
       }
     }
   }
@@ -501,7 +516,7 @@ class BlockScoping {
 
     // remap loop heads with colliding variables
     if (this.loop) {
-      for (const name in outsideRefs) {
+      for (const name of Object.keys(outsideRefs)) {
         const id = outsideRefs[name];
 
         if (
@@ -745,7 +760,7 @@ class BlockScoping {
       closurify: false,
       loopDepth: 0,
       tdzEnabled: this.tdzEnabled,
-      addHelper: name => this.addHelper(name),
+      addHelper: name => this.state.addHelper(name),
     };
 
     if (isInLoop(this.blockPath)) {
@@ -801,7 +816,7 @@ class BlockScoping {
   pushDeclar(node: { type: "VariableDeclaration" }): Array<Object> {
     const declars = [];
     const names = t.getBindingIdentifiers(node);
-    for (const name in names) {
+    for (const name of Object.keys(names)) {
       declars.push(t.variableDeclarator(names[name]));
     }
 
@@ -839,7 +854,7 @@ class BlockScoping {
     }
 
     if (has.hasBreakContinue) {
-      for (const key in has.map) {
+      for (const key of Object.keys(has.map)) {
         cases.push(t.switchCase(t.stringLiteral(key), [has.map[key]]));
       }
 

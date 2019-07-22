@@ -20,6 +20,15 @@ describe("getTargets", () => {
     });
   });
 
+  it("allows 'defaults' query", () => {
+    const browserslistDefaults = browserslist.defaults;
+
+    const expected = getTargets({ browsers: browserslistDefaults });
+    const actual = getTargets({ browsers: "defaults" });
+
+    expect(actual).toEqual(expected);
+  });
+
   it("does not clobber browserslists defaults", () => {
     const browserslistDefaults = browserslist.defaults;
 
@@ -99,11 +108,12 @@ describe("getTargets", () => {
     it("works with current node version and string type browsers", () => {
       expect(
         getTargets({
-          browsers: "current node, chrome 55",
+          browsers: "current node, chrome 55, opera 42",
         }),
       ).toEqual({
         node: process.versions.node,
         chrome: "55.0.0",
+        opera: "42.0.0",
       });
     });
 
@@ -178,6 +188,7 @@ describe("getTargets", () => {
         chrome: "61.0.0",
         safari: "10.1.0",
         firefox: "60.0.0",
+        opera: "48.0.0",
         ios: "10.3.0",
         edge: "16.0.0",
       });
@@ -193,6 +204,7 @@ describe("getTargets", () => {
         chrome: "61.0.0",
         safari: "10.1.0",
         firefox: "60.0.0",
+        opera: "48.0.0",
         ios: "10.3.0",
         edge: "16.0.0",
       });
@@ -208,6 +220,7 @@ describe("getTargets", () => {
         chrome: "61.0.0",
         safari: "10.1.0",
         firefox: "60.0.0",
+        opera: "48.0.0",
         ios: "10.3.0",
         ie: "11.0.0",
         edge: "16.0.0",
@@ -228,6 +241,7 @@ describe("getTargets", () => {
         ie: "11.0.0",
         edge: "16.0.0",
         firefox: "60.0.0",
+        opera: "48.0.0",
       });
     });
   });

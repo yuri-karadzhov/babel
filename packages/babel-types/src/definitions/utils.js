@@ -1,5 +1,6 @@
 // @flow
 import is from "../validators/is";
+import { validateField } from "../validators/validate";
 
 export const VISITOR_KEYS: { [string]: Array<string> } = {};
 export const ALIAS_KEYS: { [string]: Array<string> } = {};
@@ -161,6 +162,34 @@ export function assertValueType(type: string): Validator {
   return validate;
 }
 
+export function assertShape(shape: { [string]: FieldOptions }): Validator {
+  function validate(node, key, val) {
+    const errors = [];
+    for (const property of Object.keys(shape)) {
+      try {
+        validateField(node, property, val[property], shape[property]);
+      } catch (error) {
+        if (error instanceof TypeError) {
+          errors.push(error.message);
+          continue;
+        }
+        throw error;
+      }
+    }
+    if (errors.length) {
+      throw new TypeError(
+        `Property ${key} of ${
+          node.type
+        } expected to have the following:\n${errors.join("\n")}`,
+      );
+    }
+  }
+
+  validate.shapeOf = shape;
+
+  return validate;
+}
+
 export function chain(...fns: Array<Validator>): Validator {
   function validate(...args) {
     for (const fn of fns) {
@@ -201,7 +230,7 @@ export default function defineType(
     fields[key] = fields[key] || {};
   }
 
-  for (const key in fields) {
+  for (const key of Object.keys(fields)) {
     const field = fields[key];
 
     if (builder.indexOf(key) === -1) {

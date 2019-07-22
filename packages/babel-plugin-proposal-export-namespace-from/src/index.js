@@ -6,6 +6,7 @@ export default declare(api => {
   api.assertVersion(7);
 
   return {
+    name: "proposal-export-namespace-from",
     inherits: syntaxExportNamespaceFrom,
 
     visitor: {
@@ -42,7 +43,8 @@ export default declare(api => {
           nodes.push(node);
         }
 
-        path.replaceWithMultiple(nodes);
+        const [importDeclaration] = path.replaceWithMultiple(nodes);
+        path.scope.registerDeclaration(importDeclaration);
       },
     },
   };

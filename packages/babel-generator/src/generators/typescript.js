@@ -127,6 +127,9 @@ export function TSIndexSignature(node) {
 export function TSAnyKeyword() {
   this.word("any");
 }
+export function TSUnknownKeyword() {
+  this.word("unknown");
+}
 export function TSNumberKeyword() {
   this.word("number");
 }
@@ -228,7 +231,7 @@ export function tsPrintBraced(members, node) {
 }
 
 export function TSArrayType(node) {
-  this.print(node.elementType);
+  this.print(node.elementType, node);
   this.token("[]");
 }
 
@@ -236,6 +239,16 @@ export function TSTupleType(node) {
   this.token("[");
   this.printList(node.elementTypes, node);
   this.token("]");
+}
+
+export function TSOptionalType(node) {
+  this.print(node.typeAnnotation, node);
+  this.token("?");
+}
+
+export function TSRestType(node) {
+  this.token("...");
+  this.print(node.typeAnnotation, node);
 }
 
 export function TSUnionType(node) {
@@ -461,6 +474,21 @@ export function TSModuleDeclaration(node) {
 
 export function TSModuleBlock(node) {
   this.tsPrintBraced(node.body, node);
+}
+
+export function TSImportType(node) {
+  const { argument, qualifier, typeParameters } = node;
+  this.word("import");
+  this.token("(");
+  this.print(argument, node);
+  this.token(")");
+  if (qualifier) {
+    this.token(".");
+    this.print(qualifier, node);
+  }
+  if (typeParameters) {
+    this.print(typeParameters, node);
+  }
 }
 
 export function TSImportEqualsDeclaration(node) {

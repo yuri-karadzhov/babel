@@ -24,9 +24,7 @@ export function insertBefore(nodes) {
   ) {
     return parentPath.insertBefore(nodes);
   } else if (
-    (this.isNodeType("Expression") &&
-      this.listKey !== "params" &&
-      this.listKey !== "arguments") ||
+    (this.isNodeType("Expression") && !this.isJSXElement()) ||
     (parentPath.isForStatement() && this.key === "init")
   ) {
     if (this.node) nodes.push(this.node);
@@ -105,9 +103,19 @@ export function insertAfter(nodes) {
     parentPath.isExportNamedDeclaration() ||
     (parentPath.isExportDefaultDeclaration() && this.isDeclaration())
   ) {
-    return parentPath.insertAfter(nodes);
+    return parentPath.insertAfter(
+      nodes.map(node => {
+        // Usually after an expression we can safely insert another expression:
+        //   A.insertAfter(B)
+        //     foo = A;  -> foo = (A, B);
+        // If A is an expression statement, it isn't safe anymore so we need to
+        // convert B to an expression statement
+        //     A;        -> A; B // No semicolon! It could break if followed by [!
+        return t.isExpression(node) ? t.expressionStatement(node) : node;
+      }),
+    );
   } else if (
-    this.isNodeType("Expression") ||
+    (this.isNodeType("Expression") && !this.isJSXElement()) ||
     (parentPath.isForStatement() && this.key === "init")
   ) {
     if (this.node) {
@@ -210,7 +218,7 @@ export function unshiftContainer(listKey, nodes) {
     key: 0,
   });
 
-  return path.insertBefore(nodes);
+  return path._containerInsertBefore(nodes);
 }
 
 export function pushContainer(listKey, nodes) {

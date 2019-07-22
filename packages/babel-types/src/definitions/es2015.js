@@ -1,10 +1,12 @@
 // @flow
 import defineType, {
+  assertShape,
   assertNodeType,
   assertValueType,
   chain,
   assertEach,
   assertOneOf,
+  validateOptional,
 } from "./utils";
 import {
   functionCommon,
@@ -13,13 +15,18 @@ import {
 } from "./core";
 
 defineType("AssignmentPattern", {
-  visitor: ["left", "right"],
+  visitor: ["left", "right", "decorators" /* for legacy param decorators */],
   builder: ["left", "right"],
   aliases: ["Pattern", "PatternLike", "LVal"],
   fields: {
     ...patternLikeCommon,
     left: {
-      validate: assertNodeType("Identifier", "ObjectPattern", "ArrayPattern"),
+      validate: assertNodeType(
+        "Identifier",
+        "ObjectPattern",
+        "ArrayPattern",
+        "MemberExpression",
+      ),
     },
     right: {
       validate: assertNodeType("Expression"),
@@ -87,6 +94,7 @@ defineType("ClassBody", {
         assertEach(
           assertNodeType(
             "ClassMethod",
+            "ClassPrivateMethod",
             "ClassProperty",
             "ClassPrivateProperty",
             "TSDeclareMethod",
@@ -259,6 +267,7 @@ defineType("ExportNamedDeclaration", {
       validate: assertNodeType("StringLiteral"),
       optional: true,
     },
+    exportKind: validateOptional(assertOneOf("type", "value")),
   },
 });
 
@@ -321,6 +330,11 @@ defineType("ImportDeclaration", {
     source: {
       validate: assertNodeType("StringLiteral"),
     },
+    importKind: {
+      // Handle Flowtype's extension "import {typeof foo} from"
+      validate: assertOneOf("type", "typeof", "value"),
+      optional: true,
+    },
   },
 });
 
@@ -356,7 +370,8 @@ defineType("ImportSpecifier", {
     },
     importKind: {
       // Handle Flowtype's extension "import {typeof foo} from"
-      validate: assertOneOf(null, "type", "typeof"),
+      validate: assertOneOf("type", "typeof"),
+      optional: true,
     },
   },
 });
@@ -471,7 +486,11 @@ defineType("ClassMethod", {
 });
 
 defineType("ObjectPattern", {
-  visitor: ["properties", "typeAnnotation"],
+  visitor: [
+    "properties",
+    "typeAnnotation",
+    "decorators" /* for legacy param decorators */,
+  ],
   builder: ["properties"],
   aliases: ["Pattern", "PatternLike", "LVal"],
   fields: {
@@ -524,7 +543,15 @@ defineType("TemplateElement", {
   builder: ["value", "tail"],
   fields: {
     value: {
-      // todo: flatten `raw` into main node
+      validate: assertShape({
+        raw: {
+          validate: assertValueType("string"),
+        },
+        cooked: {
+          validate: assertValueType("string"),
+          optional: true,
+        },
+      }),
     },
     tail: {
       validate: assertValueType("boolean"),
